@@ -59,6 +59,7 @@ async function main() {
     win32metadata: { ProductName: 'CIKE', FileDescription: 'CIKE' },
   });
   fs.copyFileSync(path.join(root, 'README-WINDOWS.md'), path.join(outputs[0], 'README-WINDOWS.md'));
+  fs.copyFileSync(path.join(root, 'docs', 'WINDOWS-COMPARISON.md'), path.join(outputs[0], 'WINDOWS-COMPARISON.md'));
   const filename = `CIKE-${require('../package.json').version}-windows-x64.zip`;
   const archive = path.join(root, 'dist', filename);
   execFileSync(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'),

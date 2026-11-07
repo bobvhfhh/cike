@@ -5,7 +5,7 @@ This is a local Windows compatibility build of upstream CIKE v0.5.15
 
 Repository: https://github.com/bobvhfhh/cike/tree/codex/windows-v0.5.15
 Fork parent: https://github.com/chainfix/cike (not the other Windows fork).
-See [comparison and design decisions](docs/WINDOWS-COMPARISON.md) for what was
+See [comparison and design decisions](WINDOWS-COMPARISON.md) for what was
 learned from engeeeee/cike and what was deliberately not adopted.
 
 ## Run
