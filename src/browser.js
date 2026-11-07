@@ -6,7 +6,7 @@ const { resolveProxy, inlineRecord } = require('./proxyconfig');
 const { ProxyStore } = require('./proxystore');
 const { checkProxy } = require('./proxycheck');
 const { privateDirectory } = require('./privatefiles');
-const { prepareDownloads, configureDownloads } = require('./downloads');
+const { prepareDownloads, configureDownloads, finishDownloads } = require('./downloads');
 
 function findFreePort(min, max) {
   return new Promise((resolve, reject) => {
@@ -100,6 +100,7 @@ class BrowserManager {
       const { options } = buildContextOptions({ ...effective, proxy });
       const debugPort = process.env.LFB_EXPOSE_DEBUGGER === '1' ? await findFreePort(4550, 4599) : null;
       const launchOptions = { ...options, headless, chromiumSandbox: true,
+        ...(process.platform === 'win32' ? { acceptDownloads: 'internal-browser-default' } : {}),
         ignoreDefaultArgs: ['--enable-automation'],
         args: ['--no-first-run', '--no-default-browser-check', '--site-per-process', '--disable-background-mode',
           '--disable-blink-features=AutomationControlled',
@@ -120,7 +121,7 @@ class BrowserManager {
       privateDirectory(directory);
       await prepareDownloads(directory, this.downloadsDirectory);
       context = await chromium.launchPersistentContext(directory, launchOptions);
-      await configureDownloads(context);
+      await configureDownloads(context, this.downloadsDirectory);
       checkCancelled();
       const session = { context, debugPort, headless, openedAt: Date.now(), forwarder, network };
       this.sessions.set(id, session);
@@ -156,6 +157,7 @@ class BrowserManager {
       await this.opening.get(id)?.catch(() => {});
       const session = this.sessions.get(id);
       if (session) {
+        await finishDownloads(session.context).catch(() => {});
         await session.context.close();
         await session.forwarder?.stop();
         if (this.sessions.get(id) === session) this.sessions.delete(id);

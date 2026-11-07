@@ -1,6 +1,7 @@
 'use strict';
 const { spawn } = require('child_process');
 const net = require('net');
+const path = require('path');
 const { proxyURL, validateProxy } = require('./proxyconfig');
 const { SocksForwarder } = require('./socksfwd');
 const quote = value => '"' + String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') + '"';
@@ -12,8 +13,13 @@ function curl(proxy, url, timeoutMs = 12000) {
     'connect-timeout = 8', 'noproxy = ""', `proxy = ${quote(proxyURL(proxy, true))}`,
     `url = ${quote(url)}`, ...(proxy.username || proxy.password ? [`proxy-user = ${quote(`${proxy.username || ''}:${proxy.password || ''}`)}`] : [])].join('\n') + '\n';
   return new Promise((resolve, reject) => {
-    const child = spawn('/usr/bin/curl', ['-q', '--config', '-'], {
-      env: { PATH: '/usr/bin:/bin', LANG: 'C', HOME: process.env.HOME }, stdio: ['pipe', 'pipe', 'ignore'],
+    const root = process.env.SystemRoot || process.env.SYSTEMROOT || process.env.WINDIR || 'C:\\Windows';
+    const executable = process.platform === 'win32' ? path.join(root, 'System32', 'curl.exe') : '/usr/bin/curl';
+    const env = process.platform === 'win32'
+      ? { SystemRoot: root, WINDIR: root, PATH: path.join(root, 'System32'), TEMP: process.env.TEMP, TMP: process.env.TMP }
+      : { PATH: '/usr/bin:/bin', LANG: 'C', HOME: process.env.HOME };
+    const child = spawn(executable, ['-q', '--config', '-'], {
+      env, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'],
     });
     let output = '', tooLarge = false;
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs + 1000);

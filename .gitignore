@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.windows-build/
 .browsers/
 data/
 *.log

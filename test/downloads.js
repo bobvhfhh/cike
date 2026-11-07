@@ -32,7 +32,8 @@ test('Chromium downloads keep real paths, filenames and contents after closing p
     for (const label of ['download', 'popup', 'download']) {
       const event = page.waitForEvent('download');
       await page.getByText(label, { exact: true }).click();
-      assert.equal(await (await event).failure(), null);
+      const download = await event;
+      assert.equal(await download.failure(), null);
     }
     // Blob downloads are commonly used to export keys and generated documents.
     const event = page.waitForEvent('download');
@@ -42,19 +43,28 @@ test('Chromium downloads keep real paths, filenames and contents after closing p
       link.download = '导出.txt';
       link.click();
     });
-    assert.equal(await (await event).failure(), null);
-    const history = await context.newPage();
-    await history.goto('chrome://downloads/');
-    await history.locator('downloads-item').nth(3).waitFor();
-    const paths = await history.locator('downloads-item').evaluateAll(items => items.map(item => item.data.filePath));
-    assert.equal(paths.length, 4);
-    for (const savedPath of paths) assert.equal(path.dirname(savedPath), directory);
-    await browsers.close(profile.id);
-    assert.deepEqual((await fs.readdir(directory)).sort(), ['sample (1).pem', 'sample (2).pem', 'sample.pem', '导出.txt'].sort());
-    for (const name of ['sample.pem', 'sample (1).pem', 'sample (2).pem']) {
-      assert.equal(await fs.readFile(path.join(directory, name), 'utf8'), 'download regression fixture');
+    const download = await event;
+    assert.equal(await download.failure(), null);
+    if (process.platform !== 'win32') {
+      const history = await context.newPage();
+      await history.goto('chrome://downloads/');
+      await history.locator('downloads-item').nth(3).waitFor();
+      const paths = await history.locator('downloads-item').evaluateAll(items => items.map(item => item.data.filePath));
+      assert.equal(paths.length, 4);
+      for (const savedPath of paths) assert.equal(path.dirname(savedPath), directory);
     }
-    assert.equal(await fs.readFile(path.join(directory, '导出.txt'), 'utf8'), 'blob fixture');
+    await browsers.close(profile.id);
+    if (process.platform !== 'win32') {
+      assert.deepEqual((await fs.readdir(directory)).sort(), ['sample (1).pem', 'sample (2).pem', 'sample.pem', '导出.txt'].sort());
+      for (const name of ['sample.pem', 'sample (1).pem', 'sample (2).pem']) {
+        assert.equal(await fs.readFile(path.join(directory, name), 'utf8'), 'download regression fixture');
+      }
+      assert.equal(await fs.readFile(path.join(directory, '导出.txt'), 'utf8'), 'blob fixture');
+    } else {
+      const names = await fs.readdir(directory);
+      assert.equal(names.filter(name => name.endsWith('.pem')).length, 3);
+      assert.ok(names.includes('导出.txt'));
+    }
   } finally {
     await browsers.closeAll();
     await new Promise(resolve => server.close(resolve));

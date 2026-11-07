@@ -27,7 +27,9 @@ const { checkProxy } = require('./proxycheck');
 const { Settings } = require('./settings');
 
 const VERSION = require('../package.json').version;
-const DATA_DIR = process.env.LFB_DATA || path.join(os.homedir(), '.local-fingerprint-browser');
+const DATA_DIR = process.env.LFB_DATA || (process.platform === 'win32'
+  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'CIKE')
+  : path.join(os.homedir(), '.local-fingerprint-browser'));
 const PORT_MIN = 4440;
 const PORT_MAX = 4539;
 const DISCOVERY_FILE = 'local_api_url.txt';
@@ -44,7 +46,7 @@ function getToken(dir) {
   const f = path.join(dir, TOKEN_FILE);
   try {
     if (!fs.lstatSync(f).isFile()) throw new Error('Token 必须是普通文件');
-    fs.chmodSync(f, 0o600);
+    if (process.platform !== 'win32') fs.chmodSync(f, 0o600);
     const t = fs.readFileSync(f, 'utf8').trim();
     if (/^[a-f0-9]{48}$/.test(t)) return t;
     throw new Error('Token 文件损坏');

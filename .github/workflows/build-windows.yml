@@ -1,0 +1,100 @@
+name: Build Windows x64
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (for example 0.7.1)
+        required: true
+        type: string
+      publish:
+        description: Publish a GitHub Release
+        required: true
+        default: false
+        type: boolean
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-windows.yml'
+      - 'src/**'
+      - 'electron/**'
+      - 'test/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Set release version
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
+          npm version $env:RELEASE_VERSION --no-git-tag-version --allow-same-version
+      - run: npm ci
+      - name: Install test Chromium
+        run: npx playwright install chromium
+      - name: Run test suite
+        run: npm test
+      - name: Run desktop and icon tests
+        run: |
+          npm run test:desktop
+          npm run test:icons
+      - name: Run desktop UI smoke test against downloaded kernel
+        shell: pwsh
+        run: |
+          $env:LFB_CHROMIUM_EXECUTABLE = (Get-ChildItem "$env:LOCALAPPDATA/ms-playwright/chromium-*/chrome-win64/chrome.exe" | Select-Object -First 1 -ExpandProperty FullName)
+          if (-not $env:LFB_CHROMIUM_EXECUTABLE) { throw 'Playwright Chromium executable was not installed' }
+          npm run test:desktop
+      - name: Package Windows app
+        run: npm run pack:windows-x64
+      - name: Verify package startup and create archive
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $app = Resolve-Path 'dist/CIKE-win32-x64/CIKE.exe'
+          if (-not (Test-Path 'dist/CIKE-win32-x64/resources/app.asar')) { throw 'Packaged app payload is missing' }
+          $proc = Start-Process -FilePath $app -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 8
+          if ($proc.HasExited) { throw "Packaged application exited with code $($proc.ExitCode)" }
+          Stop-Process -Id $proc.Id -Force
+          $env:LFB_DATA = Join-Path $env:RUNNER_TEMP 'cike-package-smoke-data'
+          $proc = Start-Process -FilePath $app -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 8
+          if ($proc.HasExited) { throw "Packaged application failed with custom data path ($($proc.ExitCode))" }
+          Stop-Process -Id $proc.Id -Force
+          Compress-Archive -Path 'dist/CIKE-win32-x64/*' -DestinationPath "CIKE-$env:RELEASE_VERSION-windows-x64.zip"
+          Get-FileHash "CIKE-$env:RELEASE_VERSION-windows-x64.zip" -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  CIKE-$env:RELEASE_VERSION-windows-x64.zip" } | Set-Content SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.publish }}
+        with:
+          name: CIKE-windows-x64
+          path: |
+            CIKE-*-windows-x64.zip
+            SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        if: ${{ inputs.publish }}
+        with:
+          tag_name: v${{ inputs.version }}
+          name: CIKE v${{ inputs.version }} Windows
+          make_latest: false
+          body: |
+            Windows 11 x64 免安装版。下载 ZIP 后解压并运行 `CIKE.exe`。
+            首次启动后在设置页下载 Chromium 内核。环境数据保存在 `%LOCALAPPDATA%\CIKE`，升级时请保留。
+            请使用附带的 `SHA256SUMS.txt` 校验下载文件。
+          files: |
+            CIKE-*-windows-x64.zip
+            SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

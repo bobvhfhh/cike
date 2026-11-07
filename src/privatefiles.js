@@ -6,12 +6,12 @@ const crypto = require('crypto');
 function privateDirectory(directory) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   if (fs.lstatSync(directory).isSymbolicLink()) throw new Error('数据目录不能是符号链接');
-  fs.chmodSync(directory, 0o700);
+  if (process.platform !== 'win32') fs.chmodSync(directory, 0o700);
 }
 function readJSON(file, fallback) {
   try {
     if (!fs.lstatSync(file).isFile()) throw new Error(`不是普通数据文件：${path.basename(file)}`);
-    fs.chmodSync(file, 0o600);
+    if (process.platform !== 'win32') fs.chmodSync(file, 0o600);
     return JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (error) {
     if (error.code === 'ENOENT') return fallback;
@@ -22,7 +22,7 @@ function writePrivate(file, contents) {
   privateDirectory(path.dirname(file));
   const temporary = `${file}.${crypto.randomBytes(8).toString('hex')}.tmp`;
   try {
-    const fd = fs.openSync(temporary, 'wx', 0o600);
+    const fd = fs.openSync(temporary, 'wx', process.platform === 'win32' ? undefined : 0o600);
     try { fs.writeFileSync(fd, contents); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
     fs.renameSync(temporary, file);
   } finally { fs.rmSync(temporary, { force: true }); }

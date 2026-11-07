@@ -10,7 +10,7 @@ const path = require('path');
 const fs = require('fs');
 
 const { startBackend, DATA_DIR } = require('../src/server');
-const { chromiumStatus, downloadChromium, executableMarker } = require('./chromium');
+const { chromiumStatus, downloadChromium, executableMarker, browserVersion } = require('./chromium');
 const { checkUpdate, installUpdate } = require('./updater');
 
 let backend = null;
@@ -29,10 +29,12 @@ ipcMain.on('connection-info', event => {
 });
 
 // If Chromium was downloaded before, point the backend at it.
-function applyChromiumEnv() {
+async function applyChromiumEnv() {
   try {
     const exe = fs.readFileSync(executableMarker(DATA_DIR), 'utf8').trim();
-    if (exe) process.env.LFB_CHROMIUM_EXECUTABLE = exe;
+    if (exe && fs.existsSync(exe)) {
+      if (process.platform !== 'win32' || await browserVersion(exe)) process.env.LFB_CHROMIUM_EXECUTABLE = exe;
+    }
   } catch { /* not downloaded yet */ }
 }
 
@@ -43,6 +45,7 @@ async function createWindow() {
     minWidth: 960,
     minHeight: 640,
     title: 'CIKE',
+    ...(process.platform === 'win32' ? { icon: path.join(__dirname, 'assets', 'icon.png'), autoHideMenuBar: true } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -61,7 +64,8 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  applyChromiumEnv();
+  if (process.platform === 'win32') app.setAppUserModelId('io.cike.windows');
+  await applyChromiumEnv();
   try {
     const requireSafeStorage = () => {
       if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储不可用，无法安全读取或迁移代理凭据');

@@ -68,8 +68,10 @@ test('closing last window terminates only that environment; timestamps persist a
     for(const page of contextA.pages()) await page.close();
     for(let i=0;i<100 && manager.isOpen(a.id);i++) await delay(50);
     assert.equal(manager.isOpen(a.id),false); assert.equal(manager.isOpen(b.id),true);
-    const live=cp.execFileSync('ps',['-axo','command='],{encoding:'utf8'});
-    assert.ok(!live.includes('--user-data-dir='+store.profileDir(a.id)));
+    if (process.platform !== 'win32') {
+      const live=cp.execFileSync('ps',['-axo','command='],{encoding:'utf8'});
+      assert.ok(!live.includes('--user-data-dir='+store.profileDir(a.id)));
+    }
     await manager.open(a.id,{headless}); assert.ok(store.get(a.id).lastOpenedAt>first);
     assert.equal(new ProfileStore(dir).get(a.id).lastOpenedAt,store.get(a.id).lastOpenedAt);
     await manager.close(a.id); assert.ok(manager.isOpen(b.id));

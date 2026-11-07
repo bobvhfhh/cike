@@ -8,20 +8,31 @@ const { promisify } = require('util');
 const { pipeline } = require('stream/promises');
 const exec = promisify(execFile);
 const { privateDirectory, writePrivate } = require('../src/privatefiles');
+const { extractBrowserZip } = require('../src/zip');
 const inProgress = new Map();
 function chromiumEntry() {
   const file = path.join(path.dirname(require.resolve('playwright-core/package.json')), 'browsers.json');
   return JSON.parse(fs.readFileSync(file)).browsers.find(b => b.name === 'chromium');
 }
-function cftPlatform() {
-  const platform = { 'darwin-arm64': 'mac-arm64', 'darwin-x64': 'mac-x64', 'linux-x64': 'linux64', 'win32-x64': 'win64' }[`${process.platform}-${process.arch}`];
+function cftPlatform(platformName = process.platform, arch = process.arch) {
+  const platform = { 'darwin-arm64': 'mac-arm64', 'darwin-x64': 'mac-x64', 'linux-x64': 'linux64', 'win32-x64': 'win64' }[`${platformName}-${arch}`];
   if (!platform) throw new Error('不支持此平台的 Chromium 下载');
   return platform;
 }
-function downloadUrl() {
+function downloadUrl(platformName, arch) {
   const host = process.env.PLAYWRIGHT_DOWNLOAD_HOST || 'https://cdn.playwright.dev';
-  const platform = cftPlatform();
+  const platform = cftPlatform(platformName, arch);
   return `${host}/builds/cft/${chromiumEntry().browserVersion}/${platform}/chrome-${platform}.zip`;
+}
+async function browserVersion(executable, platform = process.platform) {
+  if (platform === 'win32') {
+    const browser = await require('playwright').chromium.launch({ executablePath: executable,
+      headless: true, chromiumSandbox: true, timeout: 15000,
+      args: ['--no-first-run', '--no-default-browser-check', '--disable-background-networking'] });
+    try { return browser.version(); } finally { await browser.close(); }
+  }
+  const { stdout } = await exec(executable, ['--version'], { timeout: 10000, maxBuffer: 65536, windowsHide: true });
+  return stdout.match(/\d+\.\d+\.\d+\.\d+/)?.[0] || null;
 }
 function browserRoot(dir) { return path.join(dir, 'browsers'); }
 function executableMarker(dir) { return path.join(browserRoot(dir), 'chromium-executable.txt'); }
@@ -29,10 +40,16 @@ async function chromiumStatus(dir) {
   const targetVersion = chromiumEntry().browserVersion;
   try {
     const executable = fs.readFileSync(executableMarker(dir), 'utf8').trim();
-    const { stdout } = await exec(executable, ['--version'], { timeout: 5000, maxBuffer: 65536 });
-    const version = stdout.match(/\d+\.\d+\.\d+\.\d+/)?.[0];
+    const version = await browserVersion(executable);
     if (version) return { installed: true, executable, version, targetVersion, updateAvailable: version !== targetVersion };
   } catch { /* not installed or unusable */ }
+  if (process.platform === 'win32' && process.resourcesPath) {
+    const bundled = findExecutable(path.join(process.resourcesPath, 'chromium'));
+    if (bundled) {
+      try { return { installed: true, executable: bundled, version: await browserVersion(bundled), targetVersion, updateAvailable: false }; }
+      catch { /* incomplete bundle */ }
+    }
+  }
   return { installed: false, executable: null, version: null, targetVersion, updateAvailable: true };
 }
 async function downloadFile(url, dest, onProgress, redirects = 0) {
@@ -78,14 +95,14 @@ async function install(dir, onProgress) {
   try {
     const zip = path.join(tmp, 'chromium.zip');
     await downloadFile(downloadUrl(), zip, onProgress);
-    await exec('/usr/bin/unzip', ['-q', zip, '-d', staging], { timeout: 600000 });
+    if (process.platform === 'darwin') await exec('/usr/bin/unzip', ['-q', zip, '-d', staging], { timeout: 600000 });
+    else await extractBrowserZip(zip, staging);
     const executable = findExecutable(staging);
     if (!executable) throw new Error('安装包中没有 Chromium');
     // Playwright's CfT archive may omit bundle resource seals. Do not repair
     // that by re-signing locally or claim Developer ID validation: transport
     // trust is HTTPS to the configured CDN, followed by a version check.
-    const { stdout } = await exec(executable, ['--version'], { timeout: 10000 });
-    if (!stdout.includes(chromiumEntry().browserVersion)) throw new Error('下载的内核版本不匹配');
+    if (await browserVersion(executable) !== chromiumEntry().browserVersion) throw new Error('下载的内核版本不匹配');
     // Keep the downloaded bundle unchanged, including its icon. Old
     // kernels remain available until the new version is fully verified.
     const destination = path.join(browserRoot(dir), `${chromiumEntry().browserVersion}-${path.basename(staging).slice(9)}`);
@@ -103,4 +120,4 @@ async function downloadChromium(dir, onProgress) {
   inProgress.set(dir, promise);
   try { return await promise; } finally { inProgress.delete(dir); }
 }
-module.exports = { chromiumStatus, downloadChromium, downloadUrl, executableMarker, browserRoot };
+module.exports = { chromiumStatus, downloadChromium, downloadUrl, executableMarker, browserRoot, browserVersion, findExecutable, cftPlatform };

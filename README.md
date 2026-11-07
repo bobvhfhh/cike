@@ -6,13 +6,13 @@
 
 <p align="center">本地多环境浏览器 · 独立会话 · 代理管理 · 自动化 API</p>
 
-## Windows 版本说明
+## Windows 版本
 
-当前正式发布仅提供 Apple 芯片版 macOS 安装包。维护者目前没有可用于完整测试的 Windows 设备，因此暂不合并和发布未经实际验证的 Windows 构建，避免提供无法确认能否安装、启动和更新的版本。
+此仓库是 `chainfix/cike` 的 Windows 兼容 fork。提供 Windows 11 x64 免安装 ZIP 包；解压后运行 `CIKE.exe`。首次使用时，在设置中下载 Chromium 内核。环境和代理数据保存在 `%LOCALAPPDATA%\\CIKE`，升级程序时请保留该目录。
 
-当前已提交的 Windows 相关 Pull Request 不会被合并，包括 Windows 安装包、打包流程和相关运行时改动；这些改动可以保留在各自的独立分支中。
+Windows 版使用当前 Windows 用户目录继承的 ACL 保护数据，不调用 POSIX 文件权限命令。安装包和 Chromium 内核均提供 SHA-256 校验值。此 fork 保留上游 v0.7.0 的安全策略、迁移逻辑和功能，不包含参考 fork 的整套旧版回退。
 
-需要 Windows 版本的用户请基于当前代码另行建立分支进行改造、构建和测试。暂不接受将这类改动合并到主分支，也不将其纳入正式发布。
+Windows Release: https://github.com/bobvhfhh/cike/releases/latest
 
 
 

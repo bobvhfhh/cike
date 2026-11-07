@@ -2,6 +2,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const os = require('os');
+const pendingDownloads = new WeakMap();
 
 // Set native preferences before launching the profile. Chromium's native
 // download manager preserves filenames, numbers collisions and records the
@@ -33,7 +34,25 @@ async function prepareDownloads(profileDirectory, directory = path.join(os.homed
   }
 }
 
-async function configureDownloads(context) {
+async function configureDownloads(context, directory = path.join(os.homedir(), 'Downloads')) {
+  if (process.platform === 'win32') {
+    await fs.mkdir(directory, { recursive: true });
+    let queue = Promise.resolve();
+    pendingDownloads.set(context, () => queue);
+    context.on('download', download => {
+      queue = queue.then(async () => {
+        const name = path.basename(download.suggestedFilename()).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+        const extension = path.extname(name), stem = path.basename(name, extension);
+        let target = path.join(directory, name), suffix = 1;
+        while (true) {
+          try { await fs.access(target); target = path.join(directory, `${stem} (${suffix++})${extension}`); }
+          catch (error) { if (error.code === 'ENOENT') break; throw error; }
+        }
+        await download.saveAs(target);
+      }).catch(error => console.error('[CIKE] Could not save browser download:', error.message));
+    });
+    return;
+  }
   const page = context.pages()[0] || await context.newPage();
   const session = await context.newCDPSession(page);
   try {
@@ -45,4 +64,6 @@ async function configureDownloads(context) {
   }
 }
 
-module.exports = { prepareDownloads, configureDownloads };
+async function finishDownloads(context) { await pendingDownloads.get(context)?.(); }
+
+module.exports = { prepareDownloads, configureDownloads, finishDownloads };

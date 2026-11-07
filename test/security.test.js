@@ -28,8 +28,13 @@ test('legacy migration is explicit, credentials stay private, corrupt data fails
     const loaded = new ProfileStore(dir, provider);
     assert.equal(loaded.get(old.id).fingerprintMode, 'legacy');
     await assert.rejects(new BrowserManager(loaded).open(old.id), /转换/);
-    assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
-    assert.equal(fs.statSync(store.file).mode & 0o777, 0o600);
+    if (process.platform === 'win32') {
+      assert.ok(fs.statSync(dir).isDirectory());
+      assert.ok(fs.statSync(store.file).isFile());
+    } else {
+      assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
+      assert.equal(fs.statSync(store.file).mode & 0o777, 0o600);
+    }
     assert.ok(!fs.readFileSync(store.file, 'utf8').includes('test-secret'));
     assert.equal(loaded.get(old.id).proxy.password, 'test-secret');
     assert.equal(loaded.public(loaded.get(old.id)).proxy.password, undefined);
