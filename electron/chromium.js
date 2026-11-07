@@ -74,7 +74,10 @@ async function downloadFile(url, dest, onProgress, redirects = 0) {
   await pipeline(response, fs.createWriteStream(dest, { flags: 'wx', mode: 0o600 }));
 }
 function findExecutable(root) {
-  for (const e of fs.readdirSync(root, { withFileTypes: true })) {
+  let entries;
+  try { entries = fs.readdirSync(root, { withFileTypes: true }); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  for (const e of entries) {
     const full = path.join(root, e.name);
     if (e.isDirectory()) {
       if (e.name.endsWith('.app')) {

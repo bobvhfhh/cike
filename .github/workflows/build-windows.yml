@@ -77,6 +77,9 @@ jobs:
           Start-Sleep -Seconds 8
           if ($proc.HasExited) { throw "Packaged application failed with custom data path ($($proc.ExitCode))" }
           Stop-Process -Id $proc.Id -Force
+          $env:CIKE_TEST_APP = $app
+          npm run test:desktop
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Compress-Archive -Path 'dist/CIKE-win32-x64/*' -DestinationPath "CIKE-$env:RELEASE_VERSION-windows-x64.zip"
           Get-FileHash "CIKE-$env:RELEASE_VERSION-windows-x64.zip" -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  CIKE-$env:RELEASE_VERSION-windows-x64.zip" } | Set-Content SHA256SUMS.txt -Encoding ascii
       - uses: actions/upload-artifact@v4
@@ -91,7 +94,7 @@ jobs:
         with:
           tag_name: v${{ inputs.version }}
           name: CIKE v${{ inputs.version }} Windows
-          make_latest: false
+          make_latest: true
           body: |
             Windows 11 x64 免安装版。下载 ZIP 后解压并运行 `CIKE.exe`。
             首次启动后在设置页下载 Chromium 内核。环境数据保存在 `%LOCALAPPDATA%\CIKE`，升级时请保留。

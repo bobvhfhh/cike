@@ -30,6 +30,14 @@ test('sandboxed desktop UI can authenticate, migrate profiles and protect secret
       env: { ...process.env, LFB_DATA: dir }, timeout: 30000 });
     const page = await app.firstWindow();
     await page.getByText('Legacy fixture', { exact: true }).waitFor();
+    const kernel = await page.evaluate(() => window.lfb.chromiumStatus());
+    assert.equal(typeof kernel.installed, 'boolean');
+    if (!process.env.LFB_CHROMIUM_EXECUTABLE) {
+      assert.equal(kernel.installed, false);
+      await page.locator('[data-page="settings"]').click();
+      await page.getByText('未安装', { exact: true }).waitFor();
+      await page.locator('[data-page="profiles"]').click();
+    }
     assert.ok(await page.getByText('旧环境 · 需要转换', { exact: true }).isVisible());
     const preferences = await app.evaluate(({ BrowserWindow }) => {
       const p = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
@@ -90,7 +98,7 @@ test('sandboxed desktop UI can authenticate, migrate profiles and protect secret
       if (process.env.CIKE_SCREENSHOT) await page.screenshot({ path: process.env.CIKE_SCREENSHOT });
     } finally {
       await app.evaluate(async ({ clipboard, ClipboardItem }) => {
-        const items = await Promise.all(globalThis.cikeClipboardBackup.map(async item => {
+        const items = await Promise.all(globalThis.cikeClipboardBackup.filter(item => item.types.length).map(async item => {
           const entries = await Promise.all(item.types.map(async type => [type, await item.getType(type)]));
           return new ClipboardItem(Object.fromEntries(entries));
         }));

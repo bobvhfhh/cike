@@ -24,6 +24,24 @@ test('Windows Chromium discovery finds chrome.exe in nested CfT archives', () =>
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('missing packaged Chromium resource directory is reported as not installed', async () => {
+  const previousPlatform = process.platform;
+  const previousResourcesPath = process.resourcesPath;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cike-packaged-resources-'));
+  try {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    Object.defineProperty(process, 'resourcesPath', { value: root, configurable: true });
+    const status = await chromiumStatus(path.join(root, '未安装内核'));
+    assert.equal(status.installed, false);
+    assert.equal(status.executable, null);
+  } finally {
+    Object.defineProperty(process, 'platform', { value: previousPlatform, configurable: true });
+    if (previousResourcesPath === undefined) delete process.resourcesPath;
+    else Object.defineProperty(process, 'resourcesPath', { value: previousResourcesPath, configurable: true });
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('Windows data files use inherited user ACLs and Chromium markers recover from invalid entries', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cike-win-data-'));
   const previousPlatform = process.platform;
