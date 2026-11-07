@@ -39,8 +39,11 @@ jobs:
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
-          npm version $env:RELEASE_VERSION --no-git-tag-version --allow-same-version
+          $version = $env:RELEASE_VERSION
+          if (-not $version) { $version = (Get-Content package.json | ConvertFrom-Json).version }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version' }
+          npm version $version --no-git-tag-version --allow-same-version
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - run: npm ci
       - name: Install test Chromium
         run: npx playwright install chromium

@@ -24,7 +24,7 @@
     "pack:windows-x64": "electron-packager . CIKE --platform=win32 --arch=x64 --out=dist --overwrite --prune --ignore=\"^/(test|.browsers|.windows-build|dist|.*.zip$)\""
   },
   "type": "commonjs",
-  "version": "0.7.0",
+  "version": "0.7.2",
   "devDependencies": {
     "electron": "44.10.0",
     "electron-packager": "npm:@electron/packager@20.3.0"

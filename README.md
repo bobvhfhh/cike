@@ -14,6 +14,8 @@ Windows 版使用当前 Windows 用户目录继承的 ACL 保护数据，不调�
 
 Windows Release: https://github.com/bobvhfhh/cike/releases/latest
 
+Windows 窗口支持最大化、全屏及普通窗口状态记忆；可在「设置 → 浏览器窗口」选择后续环境的默认打开方式。F11 状态会在创建新环境/新窗口后沿用，并可在退出时保存。
+
 
 
 发布流程会检查应用图标、应用签名和 DMG 完整性，并提供 `SHA256SUMS.txt` 供核对下载文件。
