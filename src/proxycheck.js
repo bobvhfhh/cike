@@ -7,11 +7,14 @@
 const { execFile } = require('child_process');
 const { ProxyStore } = require('./proxystore');
 const { SocksForwarder } = require('./socksfwd');
+const path = require('path');
 
 function curl(args, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
-    execFile('curl', ['-sS', '--max-time', String(Math.ceil(timeoutMs / 1000)), ...args],
-      { timeout: timeoutMs + 2000, maxBuffer: 1024 * 1024 },
+    const executable = process.platform === 'win32'
+      ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'curl.exe') : 'curl';
+    execFile(executable, ['-sS', '--max-time', String(Math.ceil(timeoutMs / 1000)), ...args],
+      { timeout: timeoutMs + 2000, maxBuffer: 1024 * 1024, windowsHide: true },
       (err, stdout, stderr) => {
         if (err) return reject(new Error((stderr || err.message).trim().split('\n').pop()));
         resolve(stdout.trim());

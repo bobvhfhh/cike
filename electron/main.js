@@ -16,10 +16,15 @@ let backend = null;
 let mainWindow = null;
 
 // If Chromium was downloaded before, point the backend at it.
-function applyChromiumEnv() {
+async function applyChromiumEnv() {
+  if (process.platform === 'win32') {
+    const status = await chromiumStatus(DATA_DIR);
+    if (status.installed) process.env.LFB_CHROMIUM_EXECUTABLE = status.executable;
+    return;
+  }
   try {
     const exe = fs.readFileSync(executableMarker(DATA_DIR), 'utf8').trim();
-    if (exe) process.env.LFB_CHROMIUM_EXECUTABLE = exe;
+    if (exe && (process.platform !== 'win32' || fs.existsSync(exe))) process.env.LFB_CHROMIUM_EXECUTABLE = exe;
   } catch { /* not downloaded yet */ }
 }
 
@@ -30,6 +35,8 @@ async function createWindow() {
     minWidth: 960,
     minHeight: 640,
     title: 'CIKE',
+    autoHideMenuBar: process.platform === 'win32',
+    ...(process.platform === 'win32' ? { icon: path.join(__dirname, 'assets', 'icon.png') } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -54,7 +61,8 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  applyChromiumEnv();
+  if (process.platform === 'win32') app.setAppUserModelId('io.cike.community.windows');
+  await applyChromiumEnv();
   try {
     backend = await startBackend(undefined, { resolveSystemProxy: url => session.defaultSession.resolveProxy(url), downloadsDirectory: app.getPath('downloads') });
   } catch (err) {

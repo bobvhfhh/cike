@@ -1,3 +1,7 @@
+> Windows 11 x64 community port: see [Windows instructions](README-WINDOWS.md)
+> and [port comparison and decisions](docs/WINDOWS-COMPARISON.md). This branch
+> preserves v0.5.15 behavior; the original author's latest code remains on `main`.
+
 <p align="center">
   <img src="electron/assets/icon.png" width="112" alt="CIKE 图标">
 </p>

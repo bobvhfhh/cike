@@ -23,6 +23,10 @@ function get(url, file) {
 }
 
 async function checkUpdate() {
+  if (process.platform === 'win32') return {
+    current: app.getVersion(), latest: null, available: false, manual: true,
+    message: 'Windows 版需要手动更新；请退出程序后，将新版完整解压到新目录。环境数据仍保存在原位置。',
+  };
   const current = app.getVersion();
   const release = JSON.parse(await get(`https://api.github.com/repos/${REPO}/releases/latest`));
   const version = release.tag_name?.replace(/^v/, '');

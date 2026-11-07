@@ -1,0 +1,44 @@
+name: Windows Compatibility
+
+on:
+  push:
+    branches: ['codex/windows-*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-package:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:windows
+      - run: npm run pack:win-x64
+      - name: Test the packaged application with isolated profiles
+        run: npm run test:windows-app
+      - name: Verify the ZIP checksum
+        shell: pwsh
+        run: |
+          $line = (Get-Content -LiteralPath dist/SHA256SUMS.txt -Raw).Trim() -split '\s+', 2
+          $actual = (Get-FileHash -LiteralPath (Join-Path dist $line[1]) -Algorithm SHA256).Hash
+          if ($actual.ToLowerInvariant() -ne $line[0]) { throw 'ZIP checksum mismatch' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CIKE-Windows-x64
+          path: |
+            dist/CIKE-*-windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
